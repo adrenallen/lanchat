@@ -3,6 +3,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -20,6 +21,11 @@ var networks []string
 var chatPeers []string
 var chatHistory []string
 var myIPs []string
+
+type MessageObj struct {
+	Ident string `json:"Ident"`
+	Data  string `json:"Data"`
+}
 
 func main() {
 	// fmt.Printf("%v", getMyIPs())
@@ -87,7 +93,13 @@ func pingAddressForListen(netAddr string) bool {
 		return false
 	}
 
-	fmt.Fprintf(conn, username+" joined the chat\n")
+	msgA := &MessageObj{"join", username}
+	dataEnc, err := json.Marshal(msgA)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Fprintf(conn, string(dataEnc))
 
 	conn.Close()
 
@@ -112,11 +124,11 @@ func getMyIPs() []string {
 				//mask := net.IPv4Mask(255,255,255,0) // If you have the mask as 4 integer values
 
 				prefixSize, _ := mask.Size()
-
-				if prefixSize >= 24 {
-					prefixString := strconv.Itoa(prefixSize)
-					retList = append(retList, ipnet.IP.String()+"/"+prefixString)
+				if prefixSize <= 16 {
+					prefixSize = 24
 				}
+				prefixString := strconv.Itoa(prefixSize)
+				retList = append(retList, ipnet.IP.String()+"/"+prefixString)
 
 			}
 		}
@@ -202,8 +214,25 @@ func server() {
 		conn, _ := ln.Accept()
 		checkForNewAddress(conn.LocalAddr().String())
 		message, _ := bufio.NewReader(conn).ReadString('\n')
-		chatHistory = append(chatHistory, message)
-		fmt.Printf("%v", message)
+
+		// fmt.Printf("\n\nGOT\n %v \n\n", message)
+
+		var dat map[string]string
+		message = strings.TrimRight(message, "\n")
+
+		if err := json.Unmarshal([]byte(message), &dat); err != nil {
+			panic(err)
+		}
+		switch dat["Ident"] {
+		case "message":
+			chatHistory = append(chatHistory, string(message))
+			fmt.Printf("%v", dat["Data"])
+		case "join":
+			chatHistory = append(chatHistory, string(message))
+			fmt.Printf("%v", dat["Data"]+" has joined the chat\n")
+		default:
+			panic("Received unknown message type")
+		}
 
 		conn.Close()
 
@@ -248,14 +277,20 @@ func sendMessage(text string) {
 		return
 	}
 
+	msgA := &MessageObj{"message", text}
+	dataEnc, err := json.Marshal(msgA)
+	if err != nil {
+		panic(err)
+	}
+
 	for _, addr := range chatPeers {
 		conn, err := net.Dial("tcp", addr+":"+strconv.Itoa(chatPort))
 		if err != nil {
 			// fmt.Print(err)
 		} else {
-			msg := username + " - " + text + "\n"
-			fmt.Fprintf(conn, msg)
-			chatHistory = append(chatHistory, msg)
+			// msg := username + " - " + text + "\n"
+			fmt.Fprintf(conn, string(dataEnc))
+			chatHistory = append(chatHistory, string(dataEnc))
 			conn.Close()
 		}
 
