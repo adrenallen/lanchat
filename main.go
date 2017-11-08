@@ -61,7 +61,7 @@ func main() {
 func addPeerToList(addr string) {
 	for _, myip := range myIPs {
 		if myip == addr {
-			// return
+			return
 		}
 	}
 	chatPeers = append(chatPeers, addr)
@@ -118,19 +118,7 @@ func getMyIPs() []string {
 
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				// fmt.Print(ipnet.IP.DefaultMask().String())
-				mask := net.IPMask(ipnet.IP.DefaultMask()) // If you have the mask as a string
-				//mask := net.IPv4Mask(255,255,255,0) // If you have the mask as 4 integer values
-
-				prefixSize, _ := mask.Size()
-				if prefixSize <= 16 {
-					prefixSize = 24
-				}
-				prefixString := strconv.Itoa(prefixSize)
-				retList = append(retList, ipnet.IP.String()+"/"+prefixString)
-
-			}
+			retList = append(retList, a.String())
 		}
 	}
 
