@@ -72,7 +72,7 @@ func addPeerToList(addr string) {
 func findPeers(networks []string) {
 	for _, netInt := range networks {
 		if *debugFlag {
-			fmt.Printf("\nSearching for peers on network of %v port %v as %v \n", netInt, chatPort, username)
+			fmt.Printf("\n Searching for peers on network of %v port %v as %v \n", netInt, chatPort, username)
 		}
 
 		netAddresses := getIPAddressFromNetwork(netInt)
@@ -128,7 +128,7 @@ func getMyIPs() []string {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			r, _ := regexp.Compile("169\\.254\\.[0-9]*\\.[0-9]*")
 
-			if !r.MatchString(a.String()) {
+			if !r.MatchString(a.String()) && ipnet.IP.To4() != nil {
 				retList = append(retList, a.String())
 			}
 
