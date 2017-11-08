@@ -129,6 +129,10 @@ func getMyIPs() []string {
 		}
 	}
 
+	if *debugFlag {
+		fmt.Printf("Found interface IPs of %v \n", retList)
+	}
+
 	return retList
 }
 
