@@ -69,7 +69,7 @@ func main() {
 		// go findPeers(networks)
 	}
 
-	// pingAddressForListen("10.1.1.193")
+	pingAddressForListen("10.1.1.193")
 	if *selfConnect {
 		for _, myip := range myIPs {
 			pingAddressForListen(myip)
@@ -283,9 +283,9 @@ func server() {
 		}
 		switch dat["Ident"] {
 		case "message":
-			fmt.Printf("%v - %v", getIPUsername(getIPFromString(conn.LocalAddr().String())), dat["Data"])
+			fmt.Printf("%v - %v", getIPUsername(getIPFromString(conn.RemoteAddr().String())), dat["Data"])
 		case "join":
-			addPeerToList(strings.TrimSpace(dat["Data"]), getIPFromString(conn.LocalAddr().String()))
+			addPeerToList(strings.TrimSpace(dat["Data"]), getIPFromString(conn.RemoteAddr().String()))
 
 			msgA := &MessageObj{"join", username}
 			dataEnc, err := json.Marshal(msgA)
