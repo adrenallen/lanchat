@@ -126,9 +126,8 @@ func getMyIPs() []string {
 
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			r, _ := regexp.Compile("169\\.254\\.[0-9]*\\.[0-9]*")
 
-			if !r.MatchString(a.String()) && ipnet.IP.To4() != nil {
+			if ipnet.IP.To4() != nil {
 				retList = append(retList, a.String())
 			}
 
