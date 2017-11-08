@@ -69,6 +69,7 @@ func main() {
 		// go findPeers(networks)
 	}
 
+	// pingAddressForListen("10.1.1.193")
 	if *selfConnect {
 		for _, myip := range myIPs {
 			pingAddressForListen(myip)
@@ -147,8 +148,7 @@ func pingAddressForListen(netAddr string) bool {
 	}
 
 	fmt.Fprintf(conn, "%v\n", string(dataEnc))
-
-	checkForNewAddress(getIPFromString(conn.LocalAddr().String()))
+	checkForNewAddress(getIPFromString(conn.RemoteAddr().String()))
 	message, _ := bufio.NewReader(conn).ReadString('\n')
 
 	// fmt.Printf("\n\nGOT\n %v \n\n", message)
@@ -160,10 +160,9 @@ func pingAddressForListen(netAddr string) bool {
 		panic(err)
 	}
 
-	addPeerToList(strings.TrimSpace(dat["Data"]), getIPFromString(conn.LocalAddr().String()))
+	addPeerToList(strings.TrimSpace(dat["Data"]), getIPFromString(conn.RemoteAddr().String()))
 
 	conn.Close()
-
 	return true
 
 }
