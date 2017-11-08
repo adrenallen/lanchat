@@ -101,7 +101,7 @@ func requestPeerListFrom(ip string) {
 	}
 
 	conn, err := net.Dial("tcp", ip+":"+strconv.Itoa(chatPort))
-	defer conn.Close()
+
 	if err != nil {
 		if *debugFlag {
 			fmt.Print(err)
@@ -111,7 +111,10 @@ func requestPeerListFrom(ip string) {
 		//send the request message
 		fmt.Fprintf(conn, "%v\n", string(dataEnc))
 
-		message, _ := bufio.NewReader(conn).ReadString('\n')
+		message, readerr := bufio.NewReader(conn).ReadString('\n')
+		if readerr != nil && *debugFlag {
+			fmt.Printf("error with request peer message %v\n", readerr)
+		}
 
 		var dat map[string]string
 		message = strings.TrimSpace(message)
@@ -133,7 +136,7 @@ func requestPeerListFrom(ip string) {
 		for _, cp := range dat2 {
 			pingAddressForListen(cp.Address)
 		}
-
+		conn.Close()
 	}
 
 }
@@ -186,7 +189,6 @@ func findPeers(networks []string) {
 //Attempt comms to this IP to see if they wanna talk!
 func pingAddressForListen(netAddr string) bool {
 	conn, err := net.DialTimeout("tcp", netAddr+":"+strconv.Itoa(chatPort), time.Millisecond*100)
-	defer conn.Close()
 	if *debugFlag {
 		if err != nil {
 			fmt.Println(err)
@@ -219,7 +221,7 @@ func pingAddressForListen(netAddr string) bool {
 	}
 
 	addPeerToList(strings.TrimSpace(dat["Data"]), getIPFromString(conn.RemoteAddr().String()))
-
+	conn.Close()
 	return true
 
 }
@@ -414,7 +416,10 @@ func client() {
 
 		// read in input from stdin
 		keyreader := bufio.NewReader(os.Stdin)
-		text, _ := keyreader.ReadString('\n')
+		text, err := keyreader.ReadString('\n')
+		if err != nil && *debugFlag {
+			fmt.Printf("Error with kb read %v", err)
+		}
 
 		go sendMessage(text)
 
@@ -445,7 +450,7 @@ func sendMessage(text string) {
 	for _, cp := range chatPeers {
 		addr := cp.Address
 		conn, err := net.Dial("tcp", addr+":"+strconv.Itoa(chatPort))
-		defer conn.Close()
+
 		if err != nil {
 			if *debugFlag {
 				fmt.Print(err)
@@ -453,8 +458,9 @@ func sendMessage(text string) {
 		} else {
 			// msg := username + " - " + text + "\n"
 			fmt.Fprintf(conn, "%v\n", string(dataEnc))
-			chatHistory = append(chatHistory, string(dataEnc))
 		}
+
+		conn.Close()
 
 	}
 
