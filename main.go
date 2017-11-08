@@ -101,6 +101,7 @@ func requestPeerListFrom(ip string) {
 	}
 
 	conn, err := net.Dial("tcp", ip+":"+strconv.Itoa(chatPort))
+	defer conn.Close()
 	if err != nil {
 		if *debugFlag {
 			fmt.Print(err)
@@ -133,7 +134,6 @@ func requestPeerListFrom(ip string) {
 			pingAddressForListen(cp.Address)
 		}
 
-		conn.Close()
 	}
 
 }
@@ -152,7 +152,7 @@ func addPeerToList(user string, addr string) {
 
 	for idx, cp := range chatPeers {
 		if cp.Address == addr {
-			if cp.Username != user {
+			if cp.Username != user && user != defaultName {
 				chatPeers[idx].Username = user
 				fmt.Printf("[%v] %v identified as %v\n", cp.Address, cp.Username, user)
 			}
@@ -186,6 +186,7 @@ func findPeers(networks []string) {
 //Attempt comms to this IP to see if they wanna talk!
 func pingAddressForListen(netAddr string) bool {
 	conn, err := net.DialTimeout("tcp", netAddr+":"+strconv.Itoa(chatPort), time.Millisecond*100)
+	defer conn.Close()
 	if *debugFlag {
 		if err != nil {
 			fmt.Println(err)
@@ -219,7 +220,6 @@ func pingAddressForListen(netAddr string) bool {
 
 	addPeerToList(strings.TrimSpace(dat["Data"]), getIPFromString(conn.RemoteAddr().String()))
 
-	conn.Close()
 	return true
 
 }
@@ -327,7 +327,7 @@ func server() {
 	// run loop forever (or until ctrl-c)
 	for {
 		conn, _ := ln.Accept()
-		checkForNewAddress(getIPFromString(conn.RemoteAddr().String()))
+		go checkForNewAddress(getIPFromString(conn.RemoteAddr().String()))
 		message, _ := bufio.NewReader(conn).ReadString('\n')
 
 		// fmt.Printf("\n\nGOT\n %v \n\n", message)
@@ -413,8 +413,8 @@ func client() {
 	for {
 
 		// read in input from stdin
-		reader := bufio.NewReader(os.Stdin)
-		text, _ := reader.ReadString('\n')
+		keyreader := bufio.NewReader(os.Stdin)
+		text, _ := keyreader.ReadString('\n')
 
 		go sendMessage(text)
 
@@ -445,6 +445,7 @@ func sendMessage(text string) {
 	for _, cp := range chatPeers {
 		addr := cp.Address
 		conn, err := net.Dial("tcp", addr+":"+strconv.Itoa(chatPort))
+		defer conn.Close()
 		if err != nil {
 			if *debugFlag {
 				fmt.Print(err)
@@ -453,7 +454,6 @@ func sendMessage(text string) {
 			// msg := username + " - " + text + "\n"
 			fmt.Fprintf(conn, "%v\n", string(dataEnc))
 			chatHistory = append(chatHistory, string(dataEnc))
-			conn.Close()
 		}
 
 	}
