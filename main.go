@@ -270,7 +270,7 @@ func server() {
 	// run loop forever (or until ctrl-c)
 	for {
 		conn, _ := ln.Accept()
-		checkForNewAddress(getIPFromString(conn.LocalAddr().String()))
+		checkForNewAddress(getIPFromString(conn.RemoteAddr().String()))
 		message, _ := bufio.NewReader(conn).ReadString('\n')
 
 		// fmt.Printf("\n\nGOT\n %v \n\n", message)
