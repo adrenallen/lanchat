@@ -43,7 +43,8 @@ func main() {
 	chatPort = getChatPort()
 
 	debugFlag = flag.Bool("debug", false, "Output debug info")
-	selfConnect = flag.Bool("selfConnect", false, "Connect only to itself for testing")
+	selfConnect = flag.Bool("selfconnect", false, "Connect only to itself for testing")
+	useServer := flag.Bool("server", true, "Enabling listening server")
 	flag.Parse()
 
 	networks = getMyIPs()
@@ -56,14 +57,17 @@ func main() {
 
 	}
 
-	if !*selfConnect {
-		go findPeers(networks)
-	}
-
 	fmt.Println("\nJoining the chat room\n")
 
-	go server()
+	if *useServer {
+		go server()
+	}
+
 	go client()
+
+	if !*selfConnect {
+		// go findPeers(networks)
+	}
 
 	if *selfConnect {
 		for _, myip := range myIPs {
@@ -142,7 +146,21 @@ func pingAddressForListen(netAddr string) bool {
 		panic(err)
 	}
 
-	fmt.Fprintf(conn, string(dataEnc))
+	fmt.Fprintf(conn, "%v\n", string(dataEnc))
+
+	checkForNewAddress(getIPFromString(conn.LocalAddr().String()))
+	message, _ := bufio.NewReader(conn).ReadString('\n')
+
+	// fmt.Printf("\n\nGOT\n %v \n\n", message)
+
+	var dat map[string]string
+	message = strings.TrimSpace(message)
+
+	if err := json.Unmarshal([]byte(message), &dat); err != nil {
+		panic(err)
+	}
+
+	addPeerToList(strings.TrimSpace(dat["Data"]), getIPFromString(conn.LocalAddr().String()))
 
 	conn.Close()
 
@@ -269,6 +287,14 @@ func server() {
 			fmt.Printf("%v - %v", getIPUsername(getIPFromString(conn.LocalAddr().String())), dat["Data"])
 		case "join":
 			addPeerToList(strings.TrimSpace(dat["Data"]), getIPFromString(conn.LocalAddr().String()))
+
+			msgA := &MessageObj{"join", username}
+			dataEnc, err := json.Marshal(msgA)
+			if err != nil {
+				panic(err)
+			}
+
+			fmt.Fprintf(conn, "%v\n", string(dataEnc))
 		default:
 			panic("Received unknown message type")
 		}
@@ -358,7 +384,7 @@ func sendMessage(text string) {
 			}
 		} else {
 			// msg := username + " - " + text + "\n"
-			fmt.Fprintf(conn, string(dataEnc))
+			fmt.Fprintf(conn, "%v\n", string(dataEnc))
 			chatHistory = append(chatHistory, string(dataEnc))
 			conn.Close()
 		}
