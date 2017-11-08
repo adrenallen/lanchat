@@ -26,6 +26,7 @@ var debugFlag *bool
 var selfConnect *bool
 
 const defaultName string = "anon"
+const buildNumber string = "v1.1.0"
 
 type MessageObj struct {
 	Ident string `json:"Ident"`
@@ -33,18 +34,20 @@ type MessageObj struct {
 }
 
 type ChatPeer struct {
-	Username string
-	Address  string
+	Username string `json:"Username"`
+	Address  string `json:"Address"`
 }
 
 func main() {
-	fmt.Printf("### Welcome to lanchat! ###\n")
+	fmt.Printf("### Welcome to lanchat! (%v) ###\n", buildNumber)
 	username = getUsername()
 	chatPort = getChatPort()
 
 	debugFlag = flag.Bool("debug", false, "Output debug info")
 	selfConnect = flag.Bool("selfconnect", false, "Connect only to itself for testing")
 	useServer := flag.Bool("server", true, "Enabling listening server")
+	directPeer := flag.String("peer", "", "Connect directly to this peer and request their peer list")
+	scanNetwork := flag.Bool("netscan", true, "Scan the network for other active peers")
 	flag.Parse()
 
 	networks = getMyIPs()
@@ -57,15 +60,21 @@ func main() {
 
 	}
 
-	fmt.Println("\nJoining the chat room\n")
-
 	if *useServer {
 		go server()
 	}
 
 	go client()
 
-	if !*selfConnect {
+	//if direct peer matches an IP address, then connect to them
+	if r.MatchString(*directPeer) {
+		dpIP := r.FindString(*directPeer)
+		if pingAddressForListen(dpIP) {
+			requestPeerListFrom(dpIP)
+		}
+	}
+
+	if !*selfConnect && *scanNetwork {
 		go findPeers(networks)
 	}
 
@@ -76,7 +85,55 @@ func main() {
 		}
 	}
 
+	fmt.Println("\nJoining the chat room\n")
 	for {
+	}
+
+}
+
+//request the list of peers from this IP
+func requestPeerListFrom(ip string) {
+
+	msgA := &MessageObj{"requestpeers", ""}
+	dataEnc, err := json.Marshal(msgA)
+	if err != nil {
+		panic(err)
+	}
+
+	conn, err := net.Dial("tcp", ip+":"+strconv.Itoa(chatPort))
+	if err != nil {
+		if *debugFlag {
+			fmt.Print(err)
+		}
+	} else {
+
+		//send the request message
+		fmt.Fprintf(conn, "%v\n", string(dataEnc))
+
+		message, _ := bufio.NewReader(conn).ReadString('\n')
+
+		var dat map[string]string
+		message = strings.TrimSpace(message)
+
+		if err := json.Unmarshal([]byte(message), &dat); err != nil {
+			panic(err)
+		}
+
+		var dat2 []ChatPeer
+
+		if err := json.Unmarshal([]byte(dat["Data"]), &dat2); err != nil {
+			panic(err)
+		}
+		if *debugFlag {
+			fmt.Printf("Got the following from %v - %v\n", ip, message)
+		}
+
+		//check each one we receive
+		for _, cp := range dat2 {
+			pingAddressForListen(cp.Address)
+		}
+
+		conn.Close()
 	}
 
 }
@@ -294,6 +351,17 @@ func server() {
 			}
 
 			fmt.Fprintf(conn, "%v\n", string(dataEnc))
+		case "requestpeers":
+
+			peerListEnc, _ := json.Marshal(chatPeers)
+
+			msgA := &MessageObj{"peerlist", string(peerListEnc)}
+			dataEnc, err := json.Marshal(msgA)
+			if err != nil {
+				panic(err)
+			}
+
+			fmt.Fprintf(conn, "%v\n", string(dataEnc))
 		default:
 			panic("Received unknown message type")
 		}
@@ -360,7 +428,7 @@ func sendMessage(text string) {
 		return
 	}
 
-	if strings.TrimSpace(text) == "/printnames" {
+	if strings.TrimSpace(text) == "/peers" {
 		fmt.Printf("Peer list:\n")
 		for _, cp := range chatPeers {
 			fmt.Printf("[%v] %v\n", cp.Address, cp.Username)
