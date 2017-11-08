@@ -19,14 +19,22 @@ var username string
 var chatPort int
 var reader *bufio.Reader = bufio.NewReader(os.Stdin)
 var networks []string
-var chatPeers []string
+var chatPeers []ChatPeer
 var chatHistory []string
 var myIPs []string
 var debugFlag *bool
+var selfConnect *bool
+
+const defaultName string = "anon"
 
 type MessageObj struct {
 	Ident string `json:"Ident"`
 	Data  string `json:"Data"`
+}
+
+type ChatPeer struct {
+	Username string
+	Address  string
 }
 
 func main() {
@@ -35,6 +43,7 @@ func main() {
 	chatPort = getChatPort()
 
 	debugFlag = flag.Bool("debug", false, "Output debug info")
+	selfConnect = flag.Bool("selfConnect", false, "Connect only to itself for testing")
 	flag.Parse()
 
 	networks = getMyIPs()
@@ -44,27 +53,51 @@ func main() {
 	for _, myip := range networks {
 		newAddr := r.FindString(myip)
 		myIPs = append(myIPs, newAddr)
+
 	}
 
-	go findPeers(networks)
+	if !*selfConnect {
+		go findPeers(networks)
+	}
 
 	fmt.Println("\nJoining the chat room\n")
 
 	go server()
 	go client()
 
+	if *selfConnect {
+		for _, myip := range myIPs {
+			pingAddressForListen(myip)
+		}
+	}
+
 	for {
 	}
 
 }
 
-func addPeerToList(addr string) {
+func addPeerToList(user string, addr string) {
 	for _, myip := range myIPs {
 		if myip == addr {
+			// return
+		}
+	}
+
+	user = strings.TrimSpace(user)
+	addr = strings.TrimSpace(addr)
+
+	for idx, cp := range chatPeers {
+		if cp.Address == addr {
+			if cp.Username != user {
+				chatPeers[idx].Username = user
+				fmt.Printf("[%v] %v identified as %v\n", cp.Address, cp.Username, user)
+			}
 			return
 		}
 	}
-	chatPeers = append(chatPeers, addr)
+
+	chatPeers = append(chatPeers, ChatPeer{user, addr})
+	fmt.Printf("[%v] %v has joined the chat\n", addr, user)
 
 }
 
@@ -78,7 +111,7 @@ func findPeers(networks []string) {
 		netAddresses := getIPAddressFromNetwork(netInt)
 		for _, netAd := range netAddresses {
 			if ok := pingAddressForListen(netAd); ok {
-				addPeerToList(netAd)
+				addPeerToList(defaultName, netAd)
 			}
 		}
 
@@ -218,7 +251,7 @@ func server() {
 	// run loop forever (or until ctrl-c)
 	for {
 		conn, _ := ln.Accept()
-		checkForNewAddress(conn.LocalAddr().String())
+		checkForNewAddress(getIPFromString(conn.LocalAddr().String()))
 		message, _ := bufio.NewReader(conn).ReadString('\n')
 
 		// fmt.Printf("\n\nGOT\n %v \n\n", message)
@@ -231,11 +264,9 @@ func server() {
 		}
 		switch dat["Ident"] {
 		case "message":
-			chatHistory = append(chatHistory, string(message))
-			fmt.Printf("%v", dat["Data"])
+			fmt.Printf("%v - %v", getIPUsername(getIPFromString(conn.LocalAddr().String())), dat["Data"])
 		case "join":
-			chatHistory = append(chatHistory, string(message))
-			fmt.Printf("%v", dat["Data"]+" has joined the chat\n")
+			addPeerToList(strings.TrimSpace(dat["Data"]), getIPFromString(conn.LocalAddr().String()))
 		default:
 			panic("Received unknown message type")
 		}
@@ -245,18 +276,37 @@ func server() {
 	}
 }
 
+func getIPFromString(addr string) string {
+	r, _ := regexp.Compile("[0-9]*\\.[0-9]*\\.[0-9]*\\.[0-9]*")
+	return r.FindString(addr)
+}
+
+func getIPUsername(addr string) string {
+	for _, cp := range chatPeers {
+		if cp.Address == addr {
+			return cp.Username
+		}
+	}
+	if *debugFlag {
+		fmt.Printf("Failed to find match for %v", addr)
+	}
+
+	return defaultName
+}
+
 //check the IP we just received from to make sure we have it in our active list
 func checkForNewAddress(addr string) bool {
 
 	r, _ := regexp.Compile("[0-9]*\\.[0-9]*\\.[0-9]*\\.[0-9]*")
 	newAddr := r.FindString(addr)
-	for _, oldAddr := range chatPeers {
+	for _, cp := range chatPeers {
+		oldAddr := cp.Address
 		if oldAddr == newAddr {
 			return false
 		}
 	}
 
-	addPeerToList(newAddr)
+	addPeerToList(defaultName, newAddr)
 
 	return true
 }
@@ -283,13 +333,22 @@ func sendMessage(text string) {
 		return
 	}
 
+	if strings.TrimSpace(text) == "/printnames" {
+		fmt.Printf("Peer list:\n")
+		for _, cp := range chatPeers {
+			fmt.Printf("[%v] %v\n", cp.Address, cp.Username)
+		}
+		return
+	}
+
 	msgA := &MessageObj{"message", text}
 	dataEnc, err := json.Marshal(msgA)
 	if err != nil {
 		panic(err)
 	}
 
-	for _, addr := range chatPeers {
+	for _, cp := range chatPeers {
+		addr := cp.Address
 		conn, err := net.Dial("tcp", addr+":"+strconv.Itoa(chatPort))
 		if err != nil {
 			if *debugFlag {
