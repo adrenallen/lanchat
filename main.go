@@ -4,6 +4,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -21,6 +22,7 @@ var networks []string
 var chatPeers []string
 var chatHistory []string
 var myIPs []string
+var debugFlag *bool
 
 type MessageObj struct {
 	Ident string `json:"Ident"`
@@ -32,6 +34,8 @@ func main() {
 	fmt.Printf("### Welcome to lanchat! ###\n")
 	username = getUsername()
 	chatPort = getChatPort()
+
+	debugFlag = flag.Bool("debug", false, "Output debug info")
 
 	// pingAddressForListen("192.168.29.113")
 	// start := time.Now()
@@ -50,6 +54,7 @@ func main() {
 
 	// fmt.Printf("Time taken %v", time.Since(start))
 	fmt.Println("\nJoining the chat room\n")
+
 	go server()
 	go client()
 
@@ -89,7 +94,7 @@ func pingAddressForListen(netAddr string) bool {
 	conn, err := net.DialTimeout("tcp", netAddr+":"+strconv.Itoa(chatPort), time.Millisecond*100)
 
 	if err != nil {
-		// fmt.Println(err)
+		fmt.Println(err)
 		return false
 	}
 
