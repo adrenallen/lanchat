@@ -66,10 +66,10 @@ func main() {
 	go client()
 
 	if !*selfConnect {
-		// go findPeers(networks)
+		go findPeers(networks)
 	}
 
-	pingAddressForListen("10.1.1.193")
+	// pingAddressForListen("10.1.1.193")
 	if *selfConnect {
 		for _, myip := range myIPs {
 			pingAddressForListen(myip)
