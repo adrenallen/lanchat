@@ -147,7 +147,7 @@ func getChatPort() int {
 	un := 9002
 	fmt.Printf("Enter chat port (Default %v): ", un)
 	if userIn, _ := reader.ReadString('\n'); userIn != "" {
-		userIn = strings.TrimRight(userIn, "\n")
+		userIn = strings.TrimSpace(userIn)
 		userInParse, err := strconv.ParseInt(userIn, 10, 64)
 		if err == nil {
 			return int(userInParse)
@@ -192,12 +192,12 @@ func getUsername() string {
 
 	fmt.Print("Enter your username: ")
 	un, _ := reader.ReadString('\n')
-	un = strings.TrimRight(un, "\n")
+	un = strings.TrimSpace(un)
 	strLen := utf8.RuneCountInString(un)
 	for strLen < 3 {
 		fmt.Printf("\nUsername must be 3 characters! You entered %v.\nEnter your username: ", strconv.Itoa(strLen))
 		un, _ = reader.ReadString('\n')
-		un = strings.TrimRight(un, "\n")
+		un = strings.TrimSpace(un)
 		strLen = utf8.RuneCountInString(un)
 	}
 	return un
@@ -225,7 +225,7 @@ func server() {
 		// fmt.Printf("\n\nGOT\n %v \n\n", message)
 
 		var dat map[string]string
-		message = strings.TrimRight(message, "\n")
+		message = strings.TrimSpace(message)
 
 		if err := json.Unmarshal([]byte(message), &dat); err != nil {
 			panic(err)
