@@ -77,9 +77,11 @@ func main() {
 }
 
 func addPeerToList(user string, addr string) {
-	for _, myip := range myIPs {
-		if myip == addr {
-			// return
+	if !*selfConnect {
+		for _, myip := range myIPs {
+			if myip == addr {
+				return
+			}
 		}
 	}
 
