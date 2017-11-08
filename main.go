@@ -36,10 +36,7 @@ func main() {
 	chatPort = getChatPort()
 
 	debugFlag = flag.Bool("debug", false, "Output debug info")
-
-	// pingAddressForListen("192.168.29.113")
-	// start := time.Now()
-	// return
+	flag.Parse()
 
 	networks = getMyIPs()
 
@@ -52,7 +49,6 @@ func main() {
 
 	go findPeers(networks)
 
-	// fmt.Printf("Time taken %v", time.Since(start))
 	fmt.Println("\nJoining the chat room\n")
 
 	go server()
@@ -92,9 +88,15 @@ func findPeers(networks []string) {
 //Attempt comms to this IP to see if they wanna talk!
 func pingAddressForListen(netAddr string) bool {
 	conn, err := net.DialTimeout("tcp", netAddr+":"+strconv.Itoa(chatPort), time.Millisecond*100)
+	if *debugFlag {
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Printf("Found listener on %v\n", netAddr)
+		}
+	}
 
 	if err != nil {
-		fmt.Println(err)
 		return false
 	}
 
@@ -127,8 +129,6 @@ func getMyIPs() []string {
 		}
 	}
 
-	//TESTING STUFFZ
-	// retList = append(retList, "127.0.0.1/32")
 	return retList
 }
 
@@ -152,7 +152,7 @@ func getIPAddressFromNetwork(netString string) []string {
 	var retList []string
 	if strings.Contains(netString, "127.0.0.1") {
 
-		retList = append(retList, "127.0.0.1")
+		// retList = append(retList, "127.0.0.1")
 		return retList
 
 	}
@@ -198,7 +198,11 @@ func server() {
 	// fmt.Println("Launching server...")
 
 	// listen on all interfaces
-	ln, _ := net.Listen("tcp", ":"+strconv.Itoa(chatPort))
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(chatPort))
+
+	if err != nil {
+		panic(err)
+	}
 
 	// accept connection on port
 
@@ -279,7 +283,9 @@ func sendMessage(text string) {
 	for _, addr := range chatPeers {
 		conn, err := net.Dial("tcp", addr+":"+strconv.Itoa(chatPort))
 		if err != nil {
-			// fmt.Print(err)
+			if *debugFlag {
+				fmt.Print(err)
+			}
 		} else {
 			// msg := username + " - " + text + "\n"
 			fmt.Fprintf(conn, string(dataEnc))
