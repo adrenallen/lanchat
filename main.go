@@ -30,7 +30,6 @@ type MessageObj struct {
 }
 
 func main() {
-	// fmt.Printf("%v", getMyIPs())
 	fmt.Printf("### Welcome to lanchat! ###\n")
 	username = getUsername()
 	chatPort = getChatPort()
@@ -72,7 +71,9 @@ func addPeerToList(addr string) {
 //higher level func to loop the IPs we find on our interface network
 func findPeers(networks []string) {
 	for _, netInt := range networks {
-		// fmt.Printf("\nSearching for peers on network of %v port %v as %v", netInt, chatPort, username)
+		if *debugFlag {
+			fmt.Printf("\nSearching for peers on network of %v port %v as %v \n", netInt, chatPort, username)
+		}
 
 		netAddresses := getIPAddressFromNetwork(netInt)
 		for _, netAd := range netAddresses {
@@ -125,7 +126,12 @@ func getMyIPs() []string {
 
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			retList = append(retList, a.String())
+			r, _ := regexp.Compile("169\\.254\\.[0-9]*\\.[0-9]*")
+
+			if !r.MatchString(a.String()) {
+				retList = append(retList, a.String())
+			}
+
 		}
 	}
 
